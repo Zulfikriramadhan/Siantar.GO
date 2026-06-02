@@ -55,19 +55,22 @@ class SiantarGoController extends Controller
         return redirect()->back()->with('success', 'Pendaftaran berhasil! Data Anda sedang ditinjau oleh pihak RSUD Chasan Boesoirie.');
     }
 
-    // Dashboard Admin dengan Fitur Pencarian Nama/NIK
+    // Dashboard Admin dengan Fitur Pencarian Nama/NIK (Aman dari garis merah Intelephense)
     public function dashboardAdmin(Request $request)
     {
         $search = $request->input('search');
 
+        // Menegaskan ke Intelephense bahwa ini adalah Query Builder Laravel resmi
+        $query = Driver::query();
+
         if ($search) {
-            $drivers = Driver::where('nama_lengkap', 'LIKE', "%{$search}%")
-                             ->orWhere('nik', 'LIKE', "%{$search}%")
-                             ->latest()
-                             ->get();
-        } else {
-            $drivers = Driver::latest()->get();
+            $query->where(function($q) use ($search) {
+                $q->where('nama_lengkap', 'LIKE', '%' . $search . '%')
+                  ->orWhere('nik', 'LIKE', '%' . $search . '%');
+            });
         }
+
+        $drivers = $query->latest()->get();
 
         return view('admin_dashboard', compact('drivers', 'search'));
     }
