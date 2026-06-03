@@ -13,12 +13,12 @@ class SiantarGoController extends Controller
         return view('registrasi');
     }
 
-    // Memproses Simpan Data Driver + Berkas (Foto Wajah, SIM, STNK)
+    // Memproses Simpan Data Driver + Berkas + TTD Driver
     public function simpanRegistrasi(Request $request)
     {
         $validated = $request->validate([
             'nama_lengkap'    => 'required|string|max:255',
-            'foto_wajah'      => 'required|image|mimes:jpeg,png,jpg|max:2048', // Validasi foto wajah
+            'foto_wajah'      => 'required|image|mimes:jpeg,png,jpg|max:2048',
             'nik'             => 'required|numeric|digits:16|unique:drivers,nik',
             'no_whatsapp'     => 'required|numeric|digits_between:10,15',
             'jenis_kendaraan' => 'required|string',
@@ -27,6 +27,7 @@ class SiantarGoController extends Controller
             'alamat'          => 'required|string',
             'foto_sim'        => 'required|image|mimes:jpeg,png,jpg|max:2048',
             'foto_stnk'       => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'ttd_driver'      => 'required|string', // Menangkap string base64 ttd
         ], [
             'nik.unique'      => 'NIK ini sudah terdaftar sebagai driver.',
             'nik.digits'      => 'NIK harus tepat 16 digit.',
@@ -35,17 +36,12 @@ class SiantarGoController extends Controller
             'max'             => 'Ukuran file maksimal 2MB.'
         ]);
 
-        // Proses simpan file foto wajah
         if ($request->hasFile('foto_wajah')) {
             $validated['foto_wajah'] = $request->file('foto_wajah')->store('wajah', 'public');
         }
-
-        // Proses simpan file foto SIM
         if ($request->hasFile('foto_sim')) {
             $validated['foto_sim'] = $request->file('foto_sim')->store('sim', 'public');
         }
-
-        // Proses simpan file foto STNK
         if ($request->hasFile('foto_stnk')) {
             $validated['foto_stnk'] = $request->file('foto_stnk')->store('stnk', 'public');
         }
@@ -55,12 +51,9 @@ class SiantarGoController extends Controller
         return redirect()->back()->with('success', 'Pendaftaran berhasil! Data Anda sedang ditinjau oleh pihak RSUD Chasan Boesoirie.');
     }
 
-    // Dashboard Admin dengan Fitur Pencarian Nama/NIK (Aman dari garis merah Intelephense)
     public function dashboardAdmin(Request $request)
     {
         $search = $request->input('search');
-
-        // Menegaskan ke Intelephense bahwa ini adalah Query Builder Laravel resmi
         $query = Driver::query();
 
         if ($search) {
@@ -71,14 +64,22 @@ class SiantarGoController extends Controller
         }
 
         $drivers = $query->latest()->get();
-
         return view('admin_dashboard', compact('drivers', 'search'));
     }
 
+    // Mengubah status + menyimpan TTD Admin secara digital
     public function verifikasiDriver(Request $request, $id)
     {
         $driver = Driver::findOrFail($id);
-        $driver->update(['status_verifikasi' => $request->status]);
+
+        $dataUpdate = ['status_verifikasi' => $request->status];
+
+        // Jika disetujui, tangkap gambar TTD Admin
+        if ($request->status == 'Disetujui' && $request->filled('ttd_admin')) {
+            $dataUpdate['ttd_admin'] = $request->ttd_admin;
+        }
+
+        $driver->update($dataUpdate);
 
         return redirect()->back()->with('info', 'Status driver ' . $driver->nama_lengkap . ' berhasil diubah menjadi: ' . $request->status);
     }
@@ -100,9 +101,7 @@ class SiantarGoController extends Controller
             return redirect()->intended('/admin/dashboard');
         }
 
-        return back()->withErrors([
-            'email' => 'Email atau password yang Anda masukkan salah.',
-        ])->onlyInput('email');
+        return back()->withErrors(['email' => 'Email atau password salah.'])->onlyInput('email');
     }
 
     public function logout(Request $request)
@@ -116,7 +115,7 @@ class SiantarGoController extends Controller
     public function cekStatus(Request $request)
     {
         $request->validate(['nik' => 'required|numeric|digits:16']);
-        $driver = Driver::where('nik', $request->nik)->first();
+        $driver = Driver::query()->where('nik', $request->nik)->first();
 
         if (!$driver) {
             return back()->withErrors(['nik' => 'NIK Anda belum terdaftar di sistem Siantar.Go.']);

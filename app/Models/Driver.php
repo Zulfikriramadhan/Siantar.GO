@@ -22,6 +22,8 @@ class Driver extends Model
         'alamat',
         'foto_sim',
         'foto_stnk',
-        'status_verifikasi'
+        'status_verifikasi',
+        'ttd_driver',
+        'ttd_admin',
     ];
 }
